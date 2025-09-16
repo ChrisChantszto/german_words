@@ -5,26 +5,26 @@ import {
   UserState, 
   GameAnswer,
   InitResponse,
-  GetPuzzleResponse,
-  SubmitResultResponse,
-  UserResult
+  GetHangmanGameResponse,
+  SubmitHangmanResultResponse,
+  HangmanGame,
+  HangmanGuess
 } from '../shared/types/api';
 import { Home } from './components/Home';
-import { Game } from './components/Game';
+import { Hangman } from './components/Hangman';
 import { Result } from './components/Result';
 import { LanguagePicker } from './components/LanguagePicker';
 
-type GameScreen = 'home' | 'game' | 'result';
+type GameScreen = 'home' | 'hangman' | 'result';
 
 export const App = () => {
   // Game state
   const [screen, setScreen] = useState<GameScreen>('home');
   const [username, setUsername] = useState<string>('anonymous');
   const [userState, setUserState] = useState<UserState>({ streak: 0, maxStreak: 0 });
-  const [puzzle, setPuzzle] = useState<WordMatchDaily | null>(null);
+  const [hangmanGame, setHangmanGame] = useState<HangmanGame | null>(null);
   const [language, setLanguage] = useState<string>('de');
   const [loading, setLoading] = useState<boolean>(true);
-  const [gameAnswers, setGameAnswers] = useState<GameAnswer[]>([]);
   const [gameResults, setGameResults] = useState<{
     score: number;
     timeMs: number;
@@ -32,6 +32,8 @@ export const App = () => {
     newStreak: number;
     maxStreak: number;
     shareText: string;
+    word?: string;
+    success?: boolean;
   } | null>(null);
 
   // Initialize the app
@@ -56,97 +58,92 @@ export const App = () => {
     initApp();
   }, []);
 
-  // Load today's puzzle
-  const loadTodaysPuzzle = async () => {
+  // Load today's hangman game
+  const loadTodaysHangman = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/puzzle/today`);
-      if (!response.ok) throw new Error('Failed to load puzzle');
+      const response = await fetch(`/api/hangman/today`);
+      if (!response.ok) throw new Error('Failed to load hangman game');
       
-      const data: GetPuzzleResponse = await response.json();
-      setPuzzle(data.puzzle);
+      const data: GetHangmanGameResponse = await response.json();
+      setHangmanGame(data.game);
       setLoading(false);
-      setScreen('game');
+      setScreen('hangman');
     } catch (error) {
-      console.error('Error loading puzzle:', error);
-      showToast('Failed to load puzzle. Please try again.');
+      console.error('Error loading hangman game:', error);
+      showToast('Failed to load hangman game. Please try again.');
       setLoading(false);
     }
   };
   
-  // Load Reddit-based puzzle
-  const loadRedditPuzzle = async () => {
+  // Load practice hangman game
+  const loadPracticeHangman = async (difficulty: string = 'medium') => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/puzzle/reddit`);
-      if (!response.ok) throw new Error('Failed to load Reddit puzzle');
+      const response = await fetch(`/api/hangman/practice/${difficulty}`);
+      if (!response.ok) throw new Error('Failed to load practice hangman game');
       
-      const data: GetPuzzleResponse = await response.json();
-      setPuzzle(data.puzzle);
+      const data: GetHangmanGameResponse = await response.json();
+      setHangmanGame(data.game);
       setLoading(false);
-      setScreen('game');
+      setScreen('hangman');
     } catch (error) {
-      console.error('Error loading Reddit puzzle:', error);
-      showToast('Failed to load Reddit puzzle. Please try again.');
+      console.error('Error loading practice hangman game:', error);
+      showToast('Failed to load practice hangman game. Please try again.');
       setLoading(false);
     }
   };
 
-  // Load practice puzzle (previous day)
-  const loadPracticePuzzle = async () => {
-    try {
-      setLoading(true);
-      // For practice, we'll use yesterday's date
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().slice(0, 10);
-      
-      const response = await fetch(`/api/puzzle/${yesterdayStr}:${language}`);
-      if (!response.ok) throw new Error('Failed to load practice puzzle');
-      
-      const data: GetPuzzleResponse = await response.json();
-      setPuzzle(data.puzzle);
-      setLoading(false);
-      setScreen('game');
-    } catch (error) {
-      console.error('Error loading practice puzzle:', error);
-      showToast('Failed to load practice puzzle. Please try again.');
-      setLoading(false);
-    }
+  // Load easy practice hangman game
+  const loadEasyHangman = async () => {
+    await loadPracticeHangman('easy');
+  };
+  
+  // Load hard practice hangman game
+  const loadHardHangman = async () => {
+    await loadPracticeHangman('hard');
   };
 
-  // Handle game completion
-  const handleGameComplete = async (answers: GameAnswer[]) => {
+  // Handle hangman game completion
+  const handleHangmanComplete = async (result: {
+    word: string;
+    guesses: HangmanGuess[];
+    success: boolean;
+    timeMs: number;
+  }) => {
     try {
       setLoading(true);
-      setGameAnswers(answers);
       
-      const result: UserResult = {
+      const hangmanResult = {
         userId: username,
-        seed: puzzle?.id || '',
+        seed: hangmanGame?.id || '',
         score: 0, // Will be calculated on server
-        timeMs: 0, // Will be calculated on server
-        answers: answers
+        timeMs: result.timeMs,
+        word: result.word,
+        guesses: result.guesses,
+        success: result.success
       };
       
-      const response = await fetch('/api/submit-result', {
+      const response = await fetch('/api/hangman/submit-result', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(result)
+        body: JSON.stringify(hangmanResult)
       });
       
-      if (!response.ok) throw new Error('Failed to submit results');
+      if (!response.ok) throw new Error('Failed to submit hangman results');
       
-      const data: SubmitResultResponse = await response.json();
+      const data: SubmitHangmanResultResponse = await response.json();
       setGameResults({
         score: data.score,
         timeMs: data.timeMs,
         perfect: data.perfect,
         newStreak: data.newStreak,
         maxStreak: data.maxStreak,
-        shareText: data.shareText
+        shareText: data.shareText,
+        word: data.word,
+        success: data.success
       });
       
       // Update local user state
@@ -159,8 +156,8 @@ export const App = () => {
       setLoading(false);
       setScreen('result');
     } catch (error) {
-      console.error('Error submitting results:', error);
-      showToast('Failed to submit results. Please try again.');
+      console.error('Error submitting hangman results:', error);
+      showToast('Failed to submit hangman results. Please try again.');
       setLoading(false);
     }
   };
@@ -184,7 +181,7 @@ export const App = () => {
     <div className="flex relative flex-col justify-start items-center min-h-screen p-4 bg-gray-50">
       {/* Header */}
       <header className="w-full max-w-md flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold text-orange-600">Deutsch Matching</h1>
+        <h1 className="text-xl font-bold text-orange-600">Deutsch Hangman</h1>
         {screen !== 'home' && (
           <button 
             onClick={() => setScreen('home')}
@@ -207,28 +204,28 @@ export const App = () => {
           <Home 
             username={username}
             userState={userState}
-            onPlayDaily={loadTodaysPuzzle}
-            onPlayPractice={loadPracticePuzzle}
-            onPlayReddit={loadRedditPuzzle}
+            onPlayDaily={loadTodaysHangman}
+            onPlayPractice={loadEasyHangman}
+            onPlayReddit={loadHardHangman}
           />
         )}
         
-        {screen === 'game' && puzzle && (
-          <Game 
-            puzzle={puzzle}
-            onComplete={handleGameComplete}
+        {screen === 'hangman' && hangmanGame && (
+          <Hangman 
+            game={hangmanGame}
+            onComplete={handleHangmanComplete}
           />
         )}
         
-        {screen === 'result' && puzzle && gameResults && (
+        {screen === 'result' && gameResults && (
           <Result 
             score={gameResults.score}
             timeMs={gameResults.timeMs}
             perfect={gameResults.perfect}
             newStreak={gameResults.newStreak}
             maxStreak={gameResults.maxStreak}
-            answers={gameAnswers}
-            puzzle={puzzle}
+            hangmanWord={gameResults.word || ''}
+            hangmanSuccess={gameResults.success || false}
             shareText={gameResults.shareText}
             onPlayAgain={() => setScreen('home')}
           />
@@ -237,7 +234,7 @@ export const App = () => {
       
       {/* Footer */}
       <footer className="w-full max-w-md py-4 mt-8 text-center text-xs text-gray-500">
-        © {new Date().getFullYear()} Deutsch Matching Game
+        © {new Date().getFullYear()} Deutsch Hangman Game
       </footer>
     </div>
   );

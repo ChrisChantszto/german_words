@@ -9,8 +9,10 @@ type ResultProps = {
   perfect: boolean;
   newStreak: number;
   maxStreak: number;
-  answers: GameAnswer[];
-  puzzle: WordMatchDaily;
+  answers?: GameAnswer[];
+  puzzle?: WordMatchDaily;
+  hangmanWord?: string;
+  hangmanSuccess?: boolean;
   shareText: string;
   onPlayAgain: () => void;
 };
@@ -23,6 +25,8 @@ export const Result: React.FC<ResultProps> = ({
   maxStreak,
   answers,
   puzzle,
+  hangmanWord,
+  hangmanSuccess,
   shareText,
   onPlayAgain
 }) => {
@@ -42,7 +46,7 @@ export const Result: React.FC<ResultProps> = ({
       
       <div className="flex justify-between items-center mb-8 p-4 bg-gray-50 rounded-lg">
         <div className="text-center">
-          <div className="text-3xl font-bold text-orange-600">{score}/{puzzle.items.length}</div>
+          <div className="text-3xl font-bold text-orange-600">{score}</div>
           <div className="text-sm text-gray-500">Score</div>
         </div>
         
@@ -59,14 +63,23 @@ export const Result: React.FC<ResultProps> = ({
         )}
       </div>
       
-      {/* Emoji Grid */}
+      {/* Emoji Grid - Show different results based on game type */}
       <div className="mb-6">
         <div className="text-sm text-gray-500 mb-2">Your results:</div>
-        <div className="flex justify-center text-2xl tracking-wider">
-          {answers.map((answer, index) => (
-            <span key={index}>{answer.correct ? '🟩' : '🟥'}</span>
-          ))}
-        </div>
+        {hangmanWord ? (
+          <div className="text-center">
+            <div className="text-xl font-bold mb-2">
+              {hangmanSuccess ? '🎉 You guessed the word!' : '😔 Better luck next time!'}
+            </div>
+            <div className="text-2xl font-bold mb-4">{hangmanWord}</div>
+          </div>
+        ) : answers ? (
+          <div className="flex justify-center text-2xl tracking-wider">
+            {answers.map((answer, index) => (
+              <span key={index}>{answer.correct ? '🟩' : '🟥'}</span>
+            ))}
+          </div>
+        ) : null}
       </div>
       
       {/* Share button */}
@@ -93,44 +106,46 @@ export const Result: React.FC<ResultProps> = ({
         Discuss today's variants
       </button>
       
-      {/* Explanations */}
-      <div className="mt-8">
-        <h3 className="text-lg font-bold mb-4">Explanations</h3>
-        <div className="space-y-4">
-          {puzzle.items.map((item, index) => {
-            const answer = answers[index];
-            return (
-              <div 
-                key={item.id} 
-                className={`p-4 rounded-lg ${answer?.correct ? 'bg-green-50' : 'bg-red-50'}`}
-              >
-                <div className="flex justify-between">
-                  <div className="font-medium">{item.prompt_en}</div>
-                  <div className={answer?.correct ? 'text-green-600' : 'text-red-600'}>
-                    {answer?.correct ? 'Correct' : 'Wrong'}
+      {/* Explanations - Only show for word matching game */}
+      {puzzle && answers && (
+        <div className="mt-8">
+          <h3 className="text-lg font-bold mb-4">Explanations</h3>
+          <div className="space-y-4">
+            {puzzle.items.map((item, index) => {
+              const answer = answers[index];
+              return (
+                <div 
+                  key={item.id} 
+                  className={`p-4 rounded-lg ${answer?.correct ? 'bg-green-50' : 'bg-red-50'}`}
+                >
+                  <div className="flex justify-between">
+                    <div className="font-medium">{item.prompt_en}</div>
+                    <div className={answer?.correct ? 'text-green-600' : 'text-red-600'}>
+                      {answer?.correct ? 'Correct' : 'Wrong'}
+                    </div>
                   </div>
+                  <div className="mt-2 text-gray-700">
+                    <span className="font-medium">Answer: </span>
+                    {item.choices.find(c => c.key === item.answerKey)?.label}
+                  </div>
+                  {item.note && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      <span className="font-medium">Note: </span>
+                      {item.note}
+                    </div>
+                  )}
+                  {item.variants && item.variants.length > 0 && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      <span className="font-medium">Variants: </span>
+                      {item.variants.join(', ')}
+                    </div>
+                  )}
                 </div>
-                <div className="mt-2 text-gray-700">
-                  <span className="font-medium">Answer: </span>
-                  {item.choices.find(c => c.key === item.answerKey)?.label}
-                </div>
-                {item.note && (
-                  <div className="mt-2 text-sm text-gray-600">
-                    <span className="font-medium">Note: </span>
-                    {item.note}
-                  </div>
-                )}
-                {item.variants && item.variants.length > 0 && (
-                  <div className="mt-2 text-sm text-gray-600">
-                    <span className="font-medium">Variants: </span>
-                    {item.variants.join(', ')}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

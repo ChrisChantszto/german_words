@@ -2,9 +2,13 @@ import express from 'express';
 import { 
   InitResponse, 
   GetPuzzleResponse, 
+  GetHangmanGameResponse,
   SubmitResultResponse,
+  SubmitHangmanResultResponse,
   UserResult,
-  UserState
+  HangmanUserResult,
+  UserState,
+  HangmanDifficulty
 } from '../shared/types/api';
 import { reddit, createServer, context, getServerPort } from '@devvit/web/server';
 import { createPost } from './core/post';
@@ -14,6 +18,7 @@ import { getTodaySeed } from './lib/seed';
 import { computeScore, updateStreak, calculateTotalTime } from './lib/scoring';
 import { formatShare } from './lib/share';
 import { RedditContentManager } from './lib/reddit-content';
+import { HangmanManager } from './lib/hangman';
 
 const app = express();
 
@@ -25,6 +30,113 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.text());
 
 const router = express.Router();
+
+// Hangman game endpoints
+router.get<unknown, GetHangmanGameResponse | { status: string; message: string }>(
+  '/api/hangman/today',
+  async (_req, res): Promise<void> => {
+    try {
+      const today = new Date();
+      const game = await HangmanManager.createHangmanGame(today, 'de', 'medium');
+      
+      res.json({
+        type: 'hangman',
+        game: game
+      });
+    } catch (error) {
+      console.error('Error getting today\'s hangman game:', error);
+      let errorMessage = 'Failed to get today\'s hangman game';
+      if (error instanceof Error) {
+        errorMessage = `Hangman game error: ${error.message}`;
+      }
+      res.status(400).json({ status: 'error', message: errorMessage });
+    }
+  }
+);
+
+router.get<{ difficulty: string }, GetHangmanGameResponse | { status: string; message: string }>(
+  '/api/hangman/practice/:difficulty',
+  async (req, res): Promise<void> => {
+    try {
+      const { difficulty } = req.params;
+      const validDifficulty = ['easy', 'medium', 'hard'].includes(difficulty) 
+        ? difficulty as HangmanDifficulty 
+        : 'medium';
+      
+      const game = await HangmanManager.createPracticeGame('de', validDifficulty);
+      
+      res.json({
+        type: 'hangman',
+        game: game
+      });
+    } catch (error) {
+      console.error('Error getting practice hangman game:', error);
+      let errorMessage = 'Failed to get practice hangman game';
+      if (error instanceof Error) {
+        errorMessage = `Hangman game error: ${error.message}`;
+      }
+      res.status(400).json({ status: 'error', message: errorMessage });
+    }
+  }
+);
+
+router.post<unknown, SubmitHangmanResultResponse | { status: string; message: string }, HangmanUserResult>(
+  '/api/hangman/submit-result',
+  async (req, res): Promise<void> => {
+    try {
+      const result = req.body;
+      const { userId, seed, word, guesses, success, timeMs } = result;
+      
+      // Calculate score
+      const { score, perfect } = HangmanManager.calculateScore(word, guesses, success, timeMs);
+      
+      // Get user state and update streak
+      const userState = await GameStorage.getUserState(userId);
+      const { newStreak } = updateStreak(userState.streak, score, success ? 1 : 0);
+      
+      // Update max streak if needed
+      const maxStreak = Math.max(userState.maxStreak, newStreak);
+      
+      // Update user state
+      const updatedState: UserState = {
+        streak: newStreak,
+        maxStreak: maxStreak,
+        lastPlayed: seed
+      };
+      
+      await GameStorage.updateUserState(userId, updatedState);
+      
+      // Save the result
+      await GameStorage.saveHangmanResult({
+        ...result,
+        score
+      });
+      
+      // Generate share text
+      const shareText = HangmanManager.formatShareText(word, guesses, success, timeMs);
+      
+      res.json({
+        type: 'hangmanResult',
+        score,
+        perfect,
+        timeMs,
+        newStreak,
+        maxStreak,
+        shareText,
+        word,
+        guesses,
+        success
+      });
+    } catch (error) {
+      console.error('Error submitting hangman result:', error);
+      let errorMessage = 'Failed to submit hangman result';
+      if (error instanceof Error) {
+        errorMessage = `Hangman result error: ${error.message}`;
+      }
+      res.status(400).json({ status: 'error', message: errorMessage });
+    }
+  }
+);
 
 // Initialize the game for a user
 router.get<{ postId: string }, InitResponse | { status: string; message: string }>(

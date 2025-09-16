@@ -1,6 +1,40 @@
 // Game Types
 export type ChoiceKey = "A" | "B" | "C";
 
+// Hangman Game Types
+export type HangmanDifficulty = 'easy' | 'medium' | 'hard';
+
+export type HangmanWord = {
+  word: string;
+  hint: string;
+};
+
+export type HangmanGame = {
+  id: string;
+  lang: string;
+  date: string;
+  word: string;
+  hint: string;
+  maxAttempts: number;
+  difficulty: HangmanDifficulty;
+  meta?: { author?: string; source?: string; };
+};
+
+export type HangmanGuess = {
+  letter: string;
+  correct: boolean;
+  timestamp: number;
+};
+
+export type HangmanResult = {
+  word: string;
+  guesses: HangmanGuess[];
+  revealed: string[];
+  success: boolean;
+  timeMs: number;
+};
+
+// Legacy Types (for backward compatibility)
 export type WordMatchItem = {
   id: string;
   prompt_en: string;
@@ -29,6 +63,16 @@ export type UserResult = {
   answers: { itemId: string; pick: ChoiceKey; correct: boolean; ms: number }[];
 };
 
+export type HangmanUserResult = {
+  userId: string;
+  seed: string;
+  score: number;
+  timeMs: number;
+  word: string;
+  guesses: HangmanGuess[];
+  success: boolean;
+};
+
 export type UserState = {
   streak: number;
   maxStreak: number;
@@ -55,6 +99,11 @@ export type GetPuzzleResponse = {
   puzzle: WordMatchDaily;
 };
 
+export type GetHangmanGameResponse = {
+  type: 'hangman';
+  game: HangmanGame;
+};
+
 export type SubmitResultResponse = {
   type: 'result';
   score: number;
@@ -64,6 +113,19 @@ export type SubmitResultResponse = {
   maxStreak: number;
   shareText: string;
   answers: GameAnswer[];
+};
+
+export type SubmitHangmanResultResponse = {
+  type: 'hangmanResult';
+  score: number;
+  perfect: boolean;
+  timeMs: number;
+  newStreak: number;
+  maxStreak: number;
+  shareText: string;
+  word: string;
+  guesses: HangmanGuess[];
+  success: boolean;
 };
 
 export type GetUserStateResponse = {

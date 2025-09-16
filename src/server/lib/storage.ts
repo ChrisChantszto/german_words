@@ -1,5 +1,5 @@
 import { redis } from '@devvit/web/server';
-import { UserState, UserResult, WordMatchDaily } from '../../shared/types/api';
+import { UserState, UserResult, WordMatchDaily, HangmanGame, HangmanUserResult } from '../../shared/types/api';
 
 export class GameStorage {
   // User state management
@@ -36,6 +36,18 @@ export class GameStorage {
     const result = await redis.get(key);
     return result ? JSON.parse(result) : null;
   }
+  
+  // Hangman result storage
+  static async saveHangmanResult(result: HangmanUserResult): Promise<void> {
+    const key = `user:${result.userId}:hangman:${result.seed}`;
+    await redis.set(key, JSON.stringify(result));
+  }
+
+  static async getHangmanResult(userId: string, seed: string): Promise<HangmanUserResult | null> {
+    const key = `user:${userId}:hangman:${seed}`;
+    const result = await redis.get(key);
+    return result ? JSON.parse(result) : null;
+  }
 
   // Puzzle storage
   static async savePuzzle(puzzle: WordMatchDaily): Promise<void> {
@@ -47,6 +59,18 @@ export class GameStorage {
     const key = `wm:puzzle:${seed}`;
     const puzzle = await redis.get(key);
     return puzzle ? JSON.parse(puzzle) : null;
+  }
+  
+  // Hangman game storage
+  static async saveHangmanGame(game: HangmanGame): Promise<void> {
+    const key = `hangman:game:${game.id}`;
+    await redis.set(key, JSON.stringify(game));
+  }
+
+  static async getHangmanGame(seed: string): Promise<HangmanGame | null> {
+    const key = `hangman:game:${seed}`;
+    const game = await redis.get(key);
+    return game ? JSON.parse(game) : null;
   }
 
   // Word bank storage
