@@ -19,6 +19,9 @@ import { computeScore, updateStreak, calculateTotalTime } from './lib/scoring';
 import { formatShare } from './lib/share';
 import { RedditContentManager } from './lib/reddit-content';
 import { HangmanManager } from './lib/hangman';
+import { WordEnricherRedis } from './lib/word-enricher-redis';
+import redisApiRoutes from './routes/redis-api';
+import wordsApiRoutes from './routes/words-api';
 
 const app = express();
 
@@ -159,6 +162,17 @@ router.get<{ postId: string }, InitResponse | { status: string; message: string 
       
       // Initialize content if needed
       await ContentManager.initializeContent();
+
+      // Always enrich words from Random Words API on app open, best-effort and non-blocking
+      // This grows the Redis-backed pool without blocking the init response
+      (async () => {
+        try {
+          // Add a small number of random German words to keep latency low
+          await WordEnricherRedis.enrichWithRandomGermanWords(6);
+        } catch (e) {
+          console.warn('Background enrichment on init failed:', e);
+        }
+      })();
 
       res.json({
         type: 'init',
@@ -441,8 +455,64 @@ router.post('/internal/menu/post-create', async (_req, res): Promise<void> => {
   }
 });
 
+// Redis test endpoint
+router.post('/internal/menu/test-redis', async (_req, res): Promise<void> => {
+  try {
+    console.log('Testing Redis word storage...');
+    
+    // Initialize WordEnricherRedis
+    await WordEnricherRedis.initialize();
+    
+    // Add some test words
+    const testWords = [
+      { word: 'apfel', hint: 'A fruit', difficulty: 'easy' as const },
+      { word: 'banane', hint: 'A yellow fruit', difficulty: 'easy' as const },
+      { word: 'computer', hint: 'An electronic device', difficulty: 'medium' as const },
+      { word: 'bibliothek', hint: 'A place with books', difficulty: 'medium' as const },
+      { word: 'universität', hint: 'A place of higher education', difficulty: 'hard' as const }
+    ];
+    
+    const addedCount = await GameStorage.addTestWords(testWords);
+    
+    // Enrich with OpenThesaurus
+    const searchTerms = ['wetter', 'essen', 'sport'];
+    let enrichedCount = 0;
+    
+    for (const term of searchTerms) {
+      const count = await GameStorage.enrichWordsWithTerm(term, 3);
+      enrichedCount += count;
+    }
+    
+    // Get stats
+    const stats = await GameStorage.viewRedisStats();
+    
+    res.json({
+      status: 'success',
+      message: 'Redis test completed successfully',
+      results: {
+        addedTestWords: addedCount,
+        enrichedWords: enrichedCount,
+        germanWordsKeys: stats.germanWordsKeys,
+        wordCounts: stats.wordCounts
+      }
+    });
+  } catch (error) {
+    console.error('Error testing Redis:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Redis test failed',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 // Use router middleware
 app.use(router);
+
+// Use Redis API routes
+app.use('/api/redis', redisApiRoutes);
+// Use Words API routes
+app.use('/api/words', wordsApiRoutes);
 
 // Get port from environment variable with fallback
 const port = getServerPort();

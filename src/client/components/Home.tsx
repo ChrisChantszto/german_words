@@ -8,6 +8,7 @@ type HomeProps = {
   onPlayDaily: () => void;
   onPlayPractice: () => void;
   onPlayReddit: () => void;
+  onManageWords?: () => void;
 };
 
 export const Home: React.FC<HomeProps> = ({
@@ -15,7 +16,8 @@ export const Home: React.FC<HomeProps> = ({
   userState,
   onPlayDaily,
   onPlayPractice,
-  onPlayReddit
+  onPlayReddit,
+  onManageWords
 }) => {
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto">
@@ -69,6 +71,20 @@ export const Home: React.FC<HomeProps> = ({
           <li>Successfully guessing the word maintains your streak</li>
           <li>Perfect game (no wrong guesses) earns a bonus star ⭐</li>
         </ul>
+        
+        {onManageWords && (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <button
+              onClick={onManageWords}
+              className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-lg font-medium text-sm flex items-center justify-center"
+            >
+              <span className="mr-2">📝</span> Manage German Words
+            </button>
+            <p className="mt-2 text-xs text-gray-500 text-center">
+              Add custom words or enrich the word list using OpenThesaurus
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

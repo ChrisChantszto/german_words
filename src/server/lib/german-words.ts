@@ -1,55 +1,52 @@
-// List of German words for the Hangman game
-// Words are categorized by difficulty level
+// Word source utilities for the Hangman game
+// Runtime word selection should use Redis only. If Redis is empty, we fetch from OpenThesaurus and persist.
 
-export const germanWords = {
-  easy: [
-    { word: "hallo", hint: "A common greeting" },
-    { word: "danke", hint: "What you say when someone helps you" },
-    { word: "bitte", hint: "Please or you're welcome" },
-    { word: "haus", hint: "Where you live" },
-    { word: "katze", hint: "A common pet that meows" },
-    { word: "hund", hint: "A common pet that barks" },
-    { word: "buch", hint: "You read this" },
-    { word: "tisch", hint: "You eat on this" },
-    { word: "stuhl", hint: "You sit on this" },
-    { word: "auto", hint: "A vehicle with four wheels" }
-  ],
-  medium: [
-    { word: "schule", hint: "Where children learn" },
-    { word: "freund", hint: "Someone you like spending time with" },
-    { word: "familie", hint: "Your relatives" },
-    { word: "wasser", hint: "You drink this" },
-    { word: "sommer", hint: "The hot season" },
-    { word: "winter", hint: "The cold season" },
-    { word: "frühstück", hint: "First meal of the day" },
-    { word: "fenster", hint: "You look outside through this" },
-    { word: "straße", hint: "Cars drive on this" },
-    { word: "kuchen", hint: "A sweet dessert" }
-  ],
-  hard: [
-    { word: "sehenswürdigkeit", hint: "Tourist attraction" },
-    { word: "geschwindigkeit", hint: "How fast something moves" },
-    { word: "freundschaft", hint: "The relationship between friends" },
-    { word: "wissenschaft", hint: "Study of the natural world" },
-    { word: "verantwortung", hint: "Being accountable for something" },
-    { word: "entschuldigung", hint: "What you say when you're sorry" },
-    { word: "überraschung", hint: "Something unexpected" },
-    { word: "schwierigkeiten", hint: "Problems or challenges" },
-    { word: "wahrscheinlich", hint: "Not certain but likely" },
-    { word: "zusammenfassung", hint: "A brief overview" }
-  ]
-};
+// Import the Redis version of WordEnricher for enhanced word selection
+import { WordEnricherRedis } from './word-enricher-redis';
+import { HangmanDifficulty } from '../../shared/types/api';
+
+// No preset base words; enrichment is done via Random Words API and persisted in Redis.
 
 // Function to get a random word based on difficulty
-export function getRandomWord(difficulty: 'easy' | 'medium' | 'hard' = 'medium') {
-  const words = germanWords[difficulty];
+export async function getRandomWord(difficulty: HangmanDifficulty = 'medium') {
+  // Always prefer Redis-only words
+  let words = await WordEnricherRedis.getWords(difficulty);
+  if (!words || words.length === 0) {
+    // On-demand enrichment: fetch random German words and persist to Redis
+    await WordEnricherRedis.enrichWithRandomGermanWords(6);
+    words = await WordEnricherRedis.getWords(difficulty);
+  }
+  if (!words || words.length === 0) {
+    throw new Error(`No words available in Redis for difficulty ${difficulty}`);
+  }
   const randomIndex = Math.floor(Math.random() * words.length);
   return words[randomIndex];
 }
 
 // Function to get a word by index (for deterministic selection based on seed)
-export function getWordByIndex(difficulty: 'easy' | 'medium' | 'hard', index: number) {
-  const words = germanWords[difficulty];
+export async function getWordByIndex(difficulty: HangmanDifficulty, index: number) {
+  let words = await WordEnricherRedis.getWords(difficulty);
+  if (!words || words.length === 0) {
+    await WordEnricherRedis.enrichWithRandomGermanWords(6);
+    words = await WordEnricherRedis.getWords(difficulty);
+  }
+  if (!words || words.length === 0) {
+    throw new Error(`No words available in Redis for difficulty ${difficulty}`);
+  }
   const safeIndex = index % words.length;
   return words[safeIndex];
+}
+
+// Function to enrich the word list using OpenThesaurus API
+export async function enrichWordList(searchTerm: string, count: number = 10): Promise<number> {
+  return WordEnricherRedis.searchAndAddWords(searchTerm, count);
+}
+
+// Function to add a custom word to the collection
+export async function addCustomWord(
+  word: string,
+  hint: string,
+  difficulty?: HangmanDifficulty
+): Promise<boolean> {
+  return WordEnricherRedis.addWord(word, hint, difficulty);
 }

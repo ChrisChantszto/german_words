@@ -22,7 +22,7 @@ export class HangmanManager {
     const seedNum = Array.from(seed).reduce((acc, char) => acc + char.charCodeAt(0), 0);
     
     // Get a word based on the seed
-    const wordData = getWordByIndex(difficulty, seedNum);
+    const wordData = await getWordByIndex(difficulty, seedNum);
     // Add null check to prevent TypeScript errors
     if (!wordData) {
       throw new Error(`Failed to get word for difficulty ${difficulty}`);
@@ -60,7 +60,7 @@ export class HangmanManager {
     const seed = `${dateStr}:${language}:hangman:practice:${Date.now()}`;
     
     // Get a random word
-    const wordData = getRandomWord(difficulty);
+    const wordData = await getRandomWord(difficulty);
     // Add null check to prevent TypeScript errors
     if (!wordData) {
       throw new Error(`Failed to get random word for difficulty ${difficulty}`);

@@ -22,11 +22,28 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"
+      },
+      {
+        "label": "Test Redis Words",
+        "description": "Test the Redis word storage",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/test-redis"
       }
     ]
   },
   "triggers": {
     "onAppInstall": "/internal/on-app-install"
+  },
+  "permissions": {
+    "redis": true,
+    "http": {
+      "enable": true,
+      "domains": [
+        "api.open-thesaurus.de",
+        "random-words-api.kushcreates.com"
+      ]
+    }
   },
   "dev": {
     "subreddit": "deutsch_matching_dev"
